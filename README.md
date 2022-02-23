@@ -64,11 +64,9 @@ Guide
 
 ### Adding JSON-RPC to your application
 
-#### 1. Install django-json-rpc
+#### 1. Install django-jsonrpc
 
-    git clone git://github.com/samuraisam/django-json-rpc.git
-    cd django-json-rpc
-    python setup.py install
+    pip install django-jsonrpc
 
     # Add 'jsonrpc' to your INSTALLED_APPS in your settings.py file
 
