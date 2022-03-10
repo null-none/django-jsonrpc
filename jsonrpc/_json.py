@@ -13,9 +13,11 @@ except AttributeError:
         json.dumps = lambda obj, *args, **kwargs: json.write(obj)
         json.loads = lambda str, *args, **kwargs: json.read(str)
     except AttributeError:
-        raise ImportError('Could not load an appropriate JSON library '
-                          'currently supported are simplejson, '
-                          'python2.6 json and python-json')
+        raise ImportError(
+            "Could not load an appropriate JSON library "
+            "currently supported are simplejson, "
+            "python2.6 json and python-json"
+        )
 
 loads = json.loads
 dumps = json.dumps

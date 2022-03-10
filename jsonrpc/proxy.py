@@ -8,7 +8,7 @@ from jsonrpc._types import *
 
 
 class ServiceProxy(object):
-    def __init__(self, service_url, service_name=None, version='1.0'):
+    def __init__(self, service_url, service_name=None, version="1.0"):
         self.version = str(version)
         self.service_url = service_url
         self.service_name = service_name
@@ -21,51 +21,59 @@ class ServiceProxy(object):
 
     def __repr__(self):
         return "ServiceProxy %r" % {
-            'jsonrpc': self.version,
-            'method': self.service_name
+            "jsonrpc": self.version,
+            "method": self.service_name,
         }
 
     def send_payload(self, params):
         """Performs the actual sending action and returns the result"""
-        data = dumps({
-            'jsonrpc': self.version,
-            'method': self.service_name,
-            'params': params,
-            'id': str(uuid.uuid1())
-        }).encode('utf-8')
+        data = dumps(
+            {
+                "jsonrpc": self.version,
+                "method": self.service_name,
+                "params": params,
+                "id": str(uuid.uuid1()),
+            }
+        ).encode("utf-8")
         headers = {
-            'Content-Type': 'application/json-rpc',
-            'Accept': 'application/json-rpc',
-            'Content-Length': len(data)
+            "Content-Type": "application/json-rpc",
+            "Accept": "application/json-rpc",
+            "Content-Length": len(data),
         }
         try:
             req = urllib_request.Request(self.service_url, data, headers)
             resp = urllib_request.urlopen(req)
         except IOError as e:
             if isinstance(e, urllib_error.HTTPError):
-                if e.code not in (
-                        401, 403
-                ) and e.headers['Content-Type'] == 'application/json-rpc':
-                    return e.read().decode('utf-8')  # we got a jsonrpc-formatted respnose
+                if (
+                    e.code not in (401, 403)
+                    and e.headers["Content-Type"] == "application/json-rpc"
+                ):
+                    return e.read().decode(
+                        "utf-8"
+                    )  # we got a jsonrpc-formatted respnose
                 raise ServiceProxyException(e.code, e.headers, req)
             else:
                 raise e
-        return resp.read().decode('utf-8')
+        return resp.read().decode("utf-8")
 
     def __call__(self, *args, **kwargs):
         params = kwargs if len(kwargs) else args
-        if Any.kind(params) == Object and self.version != '2.0':
-            raise Exception('Unsupported arg type for JSON-RPC 1.0 '
-                            '(the default version for this client, '
-                            'pass version="2.0" to use keyword arguments)')
+        if Any.kind(params) == Object and self.version != "2.0":
+            raise Exception(
+                "Unsupported arg type for JSON-RPC 1.0 "
+                "(the default version for this client, "
+                'pass version="2.0" to use keyword arguments)'
+            )
 
         r = self.send_payload(params)
         y = loads(r)
-        if 'error' in y:
+        if "error" in y:
             try:
                 from django.conf import settings
+
                 if settings.DEBUG:
-                    print('JSONRPC: %s error %r' % (self.service_name, y))
+                    print("JSONRPC: %s error %r" % (self.service_name, y))
             except:
                 pass
         return y
@@ -73,9 +81,9 @@ class ServiceProxy(object):
 
 class ServiceProxyException(IOError):
     def __init__(self, code, headers, request):
-        self.args = ('An Error Occurred', code, headers, request)
+        self.args = ("An Error Occurred", code, headers, request)
         self.code = code
-        self.message = 'An Error Occurred'
+        self.message = "An Error Occurred"
         self.headers = headers
         self.request = request
 
@@ -88,16 +96,15 @@ class TestingServiceProxy(ServiceProxy):
         self.client = client
 
     def send_payload(self, params):
-        json_data = dumps({
-            'jsonrpc': self.version,
-            'method': self.service_name,
-            'params': params,
-            'id': str(uuid.uuid1())
-        })
+        json_data = dumps(
+            {
+                "jsonrpc": self.version,
+                "method": self.service_name,
+                "params": params,
+                "id": str(uuid.uuid1()),
+            }
+        )
         json_payload = FakePayload(json_data)
-        client_args = {
-            'wsgi.input': json_payload,
-            'CONTENT_LENGTH': len(json_data)
-        }
+        client_args = {"wsgi.input": json_payload, "CONTENT_LENGTH": len(json_data)}
         response = self.client.post(self.service_url, **client_args)
-        return response.content.decode('utf-8')
+        return response.content.decode("utf-8")

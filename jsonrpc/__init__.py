@@ -1,6 +1,7 @@
 import re
 import sys
 import six
+
 try:
     from inspect import getfullargspec as get_args
 except ImportError:
@@ -19,22 +20,25 @@ except ImportError:
 
 default_site = jsonrpc_site
 KWARG_RE = re.compile(
-    r'\s*(?P<arg_name>[a-zA-Z0-9_]+)\s*=\s*(?P<arg_type>[a-zA-Z]+)\s*$')
+    r"\s*(?P<arg_name>[a-zA-Z0-9_]+)\s*=\s*(?P<arg_type>[a-zA-Z]+)\s*$"
+)
 SIG_RE = re.compile(
-    r'\s*(?P<method_name>[a-zA-Z0-9._]+)\s*(\((?P<args_sig>[^)].*)?\)'
-    r'\s*(\->\s*(?P<return_sig>.*))?)?\s*$')
+    r"\s*(?P<method_name>[a-zA-Z0-9._]+)\s*(\((?P<args_sig>[^)].*)?\)"
+    r"\s*(\->\s*(?P<return_sig>.*))?)?\s*$"
+)
 
 
 class JSONRPCTypeCheckingUnavailable(Exception):
     pass
 
 
-def _type_checking_available(sig='', validate=False):
-    if not hasattr(type, '__eq__') and validate:  # and False:
+def _type_checking_available(sig="", validate=False):
+    if not hasattr(type, "__eq__") and validate:  # and False:
         raise JSONRPCTypeCheckingUnavailable(
-            'Type checking is not available in your version of Python '
-            'which is only available in Python 2.6 or later. Use Python 2.6 '
-            'or later or disable type checking in %s' % sig)
+            "Type checking is not available in your version of Python "
+            "which is only available in Python 2.6 or later. Use Python 2.6 "
+            "or later or disable type checking in %s" % sig
+        )
 
 
 def _validate_arg(value, expected):
@@ -60,12 +64,12 @@ def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
         T = eval(arg_type)
     except Exception as e:
         raise ValueError(
-            'The type of %s could not be evaluated in %s for %s: %s' %
-            (arg_type, arg, sig, str(e)))
+            "The type of %s could not be evaluated in %s for %s: %s"
+            % (arg_type, arg, sig, str(e))
+        )
     else:
         if type(T) not in (type, Type):
-            raise TypeError(
-                '%s is not a valid type in %s for %s' % (repr(T), arg, sig))
+            raise TypeError("%s is not a valid type in %s for %s" % (repr(T), arg, sig))
         return T
 
 
@@ -83,41 +87,48 @@ def _parse_sig(sig, arg_names, validate=False):
     """
     d = SIG_RE.match(sig)
     if not d:
-        raise ValueError('Invalid method signature %s' % sig)
+        raise ValueError("Invalid method signature %s" % sig)
     d = d.groupdict()
     ret = [(n, Any) for n in arg_names]
-    if 'args_sig' in d and type(
-            d['args_sig']) is str and d['args_sig'].strip():
-        for i, arg in enumerate(d['args_sig'].strip().split(',')):
+    if "args_sig" in d and type(d["args_sig"]) is str and d["args_sig"].strip():
+        for i, arg in enumerate(d["args_sig"].strip().split(",")):
             _type_checking_available(sig, validate)
-            if '=' in arg:
+            if "=" in arg:
                 if not type(ret) is OrderedDict:
                     ret = OrderedDict(ret)
                 dk = KWARG_RE.match(arg)
                 if not dk:
-                    raise ValueError('Could not parse arg type %s in %s' %
-                                     (arg, sig))
+                    raise ValueError("Could not parse arg type %s in %s" % (arg, sig))
                 dk = dk.groupdict()
                 if not sum(
-                    [(k in dk and type(dk[k]) is str and bool(dk[k].strip()))
-                         for k in ('arg_name', 'arg_type')]):
-                    raise ValueError('Invalid kwarg value %s in %s' %
-                                     (arg, sig))
-                ret[dk['arg_name']] = _eval_arg_type(dk['arg_type'], None, arg,
-                                                     sig)
+                    [
+                        (k in dk and type(dk[k]) is str and bool(dk[k].strip()))
+                        for k in ("arg_name", "arg_type")
+                    ]
+                ):
+                    raise ValueError("Invalid kwarg value %s in %s" % (arg, sig))
+                ret[dk["arg_name"]] = _eval_arg_type(dk["arg_type"], None, arg, sig)
             else:
                 if type(ret) is OrderedDict:
-                    raise ValueError('Positional arguments must occur '
-                                     'before keyword arguments in %s' % sig)
+                    raise ValueError(
+                        "Positional arguments must occur "
+                        "before keyword arguments in %s" % sig
+                    )
                 if len(ret) < i + 1:
                     ret.append((str(i), _eval_arg_type(arg, None, arg, sig)))
                 else:
                     ret[i] = (ret[i][0], _eval_arg_type(arg, None, arg, sig))
     if not type(ret) is OrderedDict:
         ret = OrderedDict(ret)
-    return (d['method_name'], ret,
-            (_eval_arg_type(d['return_sig'], Any, 'return', sig) if
-             d['return_sig'] else Any))
+    return (
+        d["method_name"],
+        ret,
+        (
+            _eval_arg_type(d["return_sig"], Any, "return", sig)
+            if d["return_sig"]
+            else Any
+        ),
+    )
 
 
 def _inject_args(sig, types):
@@ -131,22 +142,27 @@ def _inject_args(sig, types):
 
     Returns the altered signature.
     """
-    if '(' in sig:
-        parts = sig.split('(')
-        sig = '%s(%s%s%s' % (
-            parts[0], ', '.join(types),
-            (', ' if parts[1].index(')') > 0 else ''), parts[1])
+    if "(" in sig:
+        parts = sig.split("(")
+        sig = "%s(%s%s%s" % (
+            parts[0],
+            ", ".join(types),
+            (", " if parts[1].index(")") > 0 else ""),
+            parts[1],
+        )
     else:
-        sig = '%s(%s)' % (sig, ', '.join(types))
+        sig = "%s(%s)" % (sig, ", ".join(types))
     return sig
 
 
-def jsonrpc_method(name,
-                   authenticated=False,
-                   authentication_arguments=['username', 'password'],
-                   safe=False,
-                   validate=False,
-                   site=default_site):
+def jsonrpc_method(
+    name,
+    authenticated=False,
+    authentication_arguments=["username", "password"],
+    safe=False,
+    validate=False,
+    site=default_site,
+):
     """
     Wraps a function turns it into a json-rpc method. Adds several attributes
     to the function specific to the JSON-RPC machinery and adds it to the default
@@ -200,12 +216,12 @@ def jsonrpc_method(name,
 
     def decorator(func):
         arg_names = get_args(func)[0][1:]
-        X = {'name': name, 'arg_names': arg_names}
+        X = {"name": name, "arg_names": arg_names}
         if authenticated:
             if authenticated is True or six.callable(authenticated):
                 # TODO: this is an assumption
-                X['arg_names'] = authentication_arguments + X['arg_names']
-                X['name'] = _inject_args(X['name'], ('String', 'String'))
+                X["arg_names"] = authentication_arguments + X["arg_names"]
+                X["name"] = _inject_args(X["name"], ("String", "String"))
                 from django.contrib.auth import authenticate as _authenticate
                 from django.contrib.auth.models import User
             else:
@@ -213,21 +229,24 @@ def jsonrpc_method(name,
 
             @six.wraps(func)
             def _func(request, *args, **kwargs):
-                user = getattr(request, 'user', None)
-                is_authenticated = getattr(user, 'is_authenticated',
-                                           lambda: False)
-                if ((user is not None and six.callable(is_authenticated) and
-                     not is_authenticated()) or user is None):
+                user = getattr(request, "user", None)
+                is_authenticated = getattr(user, "is_authenticated", lambda: False)
+                if (
+                    user is not None
+                    and six.callable(is_authenticated)
+                    and not is_authenticated()
+                ) or user is None:
                     user = None
                     try:
-                        creds = args[:len(authentication_arguments)]
+                        creds = args[: len(authentication_arguments)]
                         if len(creds) == 0:
                             raise IndexError
                         # Django's authenticate() method takes arguments as dict
-                        user = _authenticate(username=creds[0],
-                                             password=creds[1], *creds[2:])
+                        user = _authenticate(
+                            username=creds[0], password=creds[1], *creds[2:]
+                        )
                         if user is not None:
-                            args = args[len(authentication_arguments):]
+                            args = args[len(authentication_arguments) :]
                     except IndexError:
                         auth_kwargs = {}
                         try:
@@ -235,9 +254,10 @@ def jsonrpc_method(name,
                                 auth_kwargs[auth_kwarg] = kwargs[auth_kwarg]
                         except KeyError:
                             raise InvalidParamsError(
-                                'Authenticated methods require at least '
-                                '[%(arguments)s] or {%(arguments)s} arguments' %
-                                {'arguments': ', '.join(authentication_arguments)})
+                                "Authenticated methods require at least "
+                                "[%(arguments)s] or {%(arguments)s} arguments"
+                                % {"arguments": ", ".join(authentication_arguments)}
+                            )
 
                         user = _authenticate(**auth_kwargs)
                         if user is not None:
@@ -247,6 +267,7 @@ def jsonrpc_method(name,
                         raise InvalidCredentialsError
                     request.user = user
                 return func(request, *args, **kwargs)
+
         else:
             _func = func
 
@@ -256,8 +277,9 @@ def jsonrpc_method(name,
                 return _func(*a, **kw)
             except Exception as e:
                 try:
-                    print('JSONRPC SERVICE EXCEPTION')
+                    print("JSONRPC SERVICE EXCEPTION")
                     import traceback
+
                     traceback.print_exc()
                 except:
                     pass
@@ -265,14 +287,13 @@ def jsonrpc_method(name,
 
         ret_func = exc_printer
 
-        method, arg_types, return_type = \
-      _parse_sig(X['name'], X['arg_names'], validate)
-        ret_func.json_args = X['arg_names']
+        method, arg_types, return_type = _parse_sig(X["name"], X["arg_names"], validate)
+        ret_func.json_args = X["arg_names"]
         ret_func.json_arg_types = arg_types
         ret_func.json_return_type = return_type
         ret_func.json_method = method
         ret_func.json_safe = safe
-        ret_func.json_sig = X['name']
+        ret_func.json_sig = X["name"]
         ret_func.json_validate = validate
         site.register(method, ret_func)
         return ret_func
